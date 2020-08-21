@@ -7,7 +7,7 @@
       ref="popperRef"
       role="tooltip"
       :aria-hidden="visible ? 'false' : 'true'"
-      :class="['el-popper', 'is-' + effect, popperClass]"
+      :class="['el-popper', 'is-' + effect, popperClass, pure ? 'el-popper__pure' : '']"
       @mouseenter="_show"
       @mouseleave="_hide"
     >
@@ -45,18 +45,11 @@ import { generateId } from '@element-plus/utils/util'
 import { on, off } from '@element-plus/utils/dom'
 import throwError from '@element-plus/utils/error'
 
-import useModifer from './useModifier'
-
-import type { PropType, Ref } from 'vue'
-import type {
-  Placement,
-  Instance as PopperInstance,
-  PositioningStrategy,
-} from '@popperjs/core'
 import useModifier from './useModifier'
 
-type Effect = 'dark' | 'light';
-type RefElement = Nullable<HTMLElement>
+import type { PropType, Ref } from 'vue'
+
+import type { Effect, Offset, Placement, PopperInstance, PositioningStrategy, RefElement, Options } from './popper'
 
 const stop = (e: Event) => e.stopPropagation()
 
@@ -124,9 +117,9 @@ export default defineComponent({
       default: 0,
     },
     offset: {
-      type: [Number, Array] as PropType<[number, number] | number>,
-      default: [0, 12] as [number, number],
-      validator: (val: [number, number] | number): boolean => {
+      type: [Number, Array] as PropType<Offset>,
+      default: [0, 12] as Offset,
+      validator: (val: Offset): boolean => {
         return (isArray(val) && val.length === 2) || typeof val === 'number'
       },
     },
@@ -137,6 +130,15 @@ export default defineComponent({
     popperClass: {
       type: String,
       default: '',
+    },
+    pure: {
+      type: Boolean,
+      default: false,
+    },
+    // Once this option were given, the entire popper is under the users' control, top priority
+    popperOptions: {
+      type: Object as PropType<Options>,
+      default: () => null,
     },
     referrer: {
       type: HTMLElement as PropType<Nullable<HTMLElement>>,
@@ -160,7 +162,7 @@ export default defineComponent({
     },
     value: {
       type: Boolean,
-      default: true,
+      default: false,
     },
   },
   setup(props, { slots }) {
@@ -299,16 +301,18 @@ export default defineComponent({
         throwError(compName, 'Cannot find referrer to attach popper to')
       }
       trigger.value = referenceElement
-      const modifiers = useModifer(popperOptions.value.modifierOptions)
 
-      popperInstance.value = createPopper(referenceElement, popperRef.value, {
-        placement: popperOptions.value.placement,
-        onFirstUpdate: () => {
-          popperInstance.value.forceUpdate()
-        },
-        strategy: popperOptions.value.strategy,
-        modifiers,
-      })
+      popperInstance.value = createPopper(referenceElement, popperRef.value,
+        props.popperOptions === null
+          ? props.popperOptions
+          : {
+            placement: popperOptions.value.placement,
+            onFirstUpdate: () => {
+              popperInstance.value.forceUpdate()
+            },
+            strategy: popperOptions.value.strategy,
+            modifiers: useModifier(popperOptions.value.modifierOptions),
+          })
       referenceElement.setAttribute('aria-describedby', popperId.value)
       referenceElement.setAttribute('tabindex', props.tabIndex)
       on(referenceElement, 'mouseenter', _show)
